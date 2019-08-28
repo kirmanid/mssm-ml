@@ -2,7 +2,7 @@ w = [1,1]
 x = [[1,5],[1,4],[1,3],[1,2],[1,1]]
 y = [2,5,6,8,10]
 
-learningRate = 0.01
+learningRate = 0.1
 
 def hypothesis(w,xRow):
     # make dot product later
