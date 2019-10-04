@@ -74,7 +74,7 @@ double leakyRelu(double x){
 
 int main(){
     srand(42);
-    MatrixXd features(5,2); // One row per instance of data, one column per feature
+    MatrixXd features(5,10); // One row per instance of data, one column per feature
     features.setRandom();
 
     vector<int> nodesPerLayer = {int(features.cols()), 100, 100 ,1}; // this includes input, hidden, and output nodes. For N feaatures, there are N input nodes.
