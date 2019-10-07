@@ -44,8 +44,8 @@ void mlp::makeRandomizedLayers (vector<int> nodesPerLayer, vector<function<doubl
 
 MatrixXd mlp::predict (MatrixXd features){
     MatrixXd input = features;
-    for (int i = 0; i<layers.size(); i++){
-        input = forwardPropLayer (input, i);
+    for (int layerIndex = 0; layerIndex<layers.size(); layerIndex++){
+        input = forwardPropLayer (input, layerIndex);
     }
     return input; // "input" refers to the values passed to the next layer, and eventually held by the output layer
 }
@@ -71,6 +71,7 @@ double leakyRelu(double x){
 }
 
 /// add tanh, sigmoid, softmax
+/// make member functions, make actvationFunctions a vector of pointers to those methods
 
 int main(){
     srand(42);
@@ -80,10 +81,6 @@ int main(){
     vector<int> nodesPerLayer = {int(features.cols()), 100, 100 ,1}; // this includes input, hidden, and output nodes. For N feaatures, there are N input nodes.
     vector<function<double(double)>> activationFunctions = {relu, relu, relu}; // length of this vector should be one less than that of nodesPerLayer
 
-    auto a = nn.ooh;
-    cout << a(8) <<endl; return 0;
-
     nn.makeRandomizedLayers(nodesPerLayer, activationFunctions);
     cout << nn.predict (features) << endl;
     }
-}
