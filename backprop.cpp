@@ -9,7 +9,7 @@ class mlp {
         struct layer {
             function<double(double)> activationWrapper;
             MatrixXd weights;
-            MatrixXd biases;
+            VectorXd biases;
         };
         MatrixXd forwardPropLayer (MatrixXd,int);
         vector<layer> layers;
@@ -22,9 +22,7 @@ MatrixXd mlp::forwardPropLayer (MatrixXd inputs, int layerIndex){
     MatrixXd weightedInput;
     layer layerSpecs = layers[layerIndex];
     weightedInput = inputs * layerSpecs.weights;
-    for (int i = 0; i < weightedInput.rows(); i++){ // adds biases to each instance
-        weightedInput(i, all) = weightedInput(i, all) + layerSpecs.biases;
-    }
+    weightedInput.rowwise() += layerSpecs.biases.transpose(); //adds biases to each sample in dataset
     MatrixXd activations = weightedInput.unaryExpr(layerSpecs.activationWrapper);
 
     return activations;
@@ -36,7 +34,7 @@ void mlp::makeRandomizedLayers (vector<int> nodesPerLayer, vector<function<doubl
         layer.activationWrapper = activationFunctions[i];
         MatrixXd weights (nodesPerLayer[i],nodesPerLayer[i+1]);
         layer.weights = weights.setRandom();
-        MatrixXd biases (1,nodesPerLayer[i+1]);
+        VectorXd biases (nodesPerLayer[i+1]);
         layer.biases = biases.setRandom();
         layers.push_back(layer);
     }
@@ -75,8 +73,15 @@ double leakyRelu(double x){
 
 int main(){
     srand(42);
-    MatrixXd features(5,10); // One row per instance of data, one column per feature
-    features.setRandom();
+
+    MatrixXd features (4,2); // One row per instance of data, one column per feature
+    features << 0, 0,
+                1, 0,
+                0, 1,
+                1, 1;
+    
+    MatrixXd targets (4,1);
+    targets << 0, 1, 1, 0;
 
     vector<int> nodesPerLayer = {int(features.cols()), 100, 100 ,1}; // this includes input, hidden, and output nodes. For N feaatures, there are N input nodes.
     vector<function<double(double)>> activationFunctions = {relu, relu, relu}; // length of this vector should be one less than that of nodesPerLayer
