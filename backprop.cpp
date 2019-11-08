@@ -18,9 +18,10 @@ class mlp {
         };
         double computeC(int,int,int);
         MatrixXd forwardPropLayer (MatrixXd,int);
-        vector<layerConnection> connections;
     public:
+        vector<layerConnection> connections;
         double learningRate;
+        double lambda; // for regularization
         MatrixXd targets;
         MatrixXd features;
         vector<int> nodesPerLayer;
@@ -96,11 +97,18 @@ double mlp::computeDerivative (int connectionIndex, int weightJ, int weightK, in
     b = reluPrime(nodes[currentLayerIndex].zList(sample, weightJ));
     c = computeC(connectionIndex, weightJ, sample);
 
-    //'verificiation' step using slope of secant line, small epsilon
-    double epsilon, cost_1, cost_2, secantSlope;
-    epsilon = 10^-6;
-    cost_1 = cost(targets, predict(features));
+    double derivative = a*b*c;
+
+    //adds regularization term (if weight, not bias)
     if (weightK != -1){
+        derivative += lambda * connections[connectionIndex].weights(weightK, weightJ);
+    }
+
+    // 'verificiation' step using slope of secant line, small epsilon
+    double epsilon, cost_1, cost_2, secantSlope;
+    epsilon = 10^-4;
+    cost_1 = cost(targets, predict(features));
+    if (weightK != -1){ // if not a bias
         connections[connectionIndex].weights(weightK, weightJ) += epsilon;
         cost_2 = cost(targets, predict(features));
         connections[connectionIndex].weights(weightK, weightJ) -= epsilon;
@@ -111,9 +119,10 @@ double mlp::computeDerivative (int connectionIndex, int weightJ, int weightK, in
     }
     predict (features); // necessary, as predict() changes some state, but using a false weight/bias, as it has been artificially increased by epsilon
     secantSlope = (cost_2 - cost_1)/ epsilon;
-    cout <<"Secant slope, Derivative Slope: "<< secantSlope << ", " << a*b*c << endl;
+    cout <<"Secant slope, Derivative Slope: "<< secantSlope << ", " << derivative << endl;
+    cout << "j, k, i, s: \n" << weightJ << ", " << weightK << ", " << connectionIndex << ", " << sample << endl;
 
-    return a*b*c;
+    return derivative;
 }
 
 double mlp::computeC (int connectionIndex, int weightJ, int sample){
@@ -146,12 +155,16 @@ double mlp::computeC (int connectionIndex, int weightJ, int sample){
 }
 
 
-// mean squared error
+// mean squared error with regularization
 double mlp::cost(MatrixXd a, MatrixXd b){ 
     MatrixXd diff = a - b;
     diff = diff.array().pow(2);
-    return diff.sum() / diff.size();
-
+    double mse = diff.sum() / diff.size();
+    // adds regularization term to cost function
+    for (int i = 0; i < nodesPerLayer.size() - 1; i++){
+        mse += (connections[i].weights * connections[i].weights.transpose()).sum() * lambda;
+    }
+    return mse;
 } 
 
 // nested for loop gradient descent (abomination)
@@ -207,44 +220,64 @@ double mlp::reluPrime (double x){
 
 int main(){
     srand(41);
-    nn.learningRate = 0.05;
+     
+    nn.learningRate = 0.01;
+    nn.lambda = 0.0; // regularization thingy
 
-    MatrixXd features(4,2); // One row per dataset sample, one column per feature
-    features << 0, 0,
-            1, 0,
-            0, 1,
-            1, 1; //XOR dataset
+    MatrixXd features(2,3); // One row per dataset sample, one column per feature
+    features << 1, 4, 5,
+                1, 7, 5;
     nn.features = features;
 
-    MatrixXd targets (4,1); // One row per dataset sample, one column per target length
-    targets << 0,
-        1,
-        1,
-        0; // XOR dataset targets
+    MatrixXd targets (2,2); // One row per dataset sample, one column per target length
+    targets << 0.1 , 0.05,
+                0.1, 0.05;
     nn.targets = targets;
 
-    nn.nodesPerLayer = {int(features.cols()), 10, 10, int(targets.cols())}; // Corresponds to layer index. Includes input, hidden, and output nodes. For N feaatures, there are N input nodes.
+    nn.nodesPerLayer = {int(features.cols()), 2, int(targets.cols())}; // Corresponds to layer index. Includes input, hidden, and output nodes. For N feaatures, there are N input nodes.
     nn.nodes.resize(nn.nodesPerLayer.size());
-    vector<function<double(double)>> activationFunctions = {relu, relu, relu}; // Corresponds to connection index. Length of this vector should be one less than that of nodesPerLayer.
+    vector<function<double(double)>> activationFunctions = {relu, relu}; // Corresponds to connection index. Length of this vector should be one less than that of nodesPerLayer.
     nn.makeRandomizedConnections(activationFunctions);
 
-    cout << nn.predict (features) << "\n\n";
-    nn.train(251);
-    cout << "\n XOR-trained outputs:" << endl;
+    nn.connections[0].weights << 0.1 , 0.2, 0.3, 0.4, 0.5, 0.6; // Dr Hamlin's preassigned weights
+    nn.connections[1].weights << 0.7, 0.8, 0.9, 0.1;
+
+    nn.connections[0].biases << 0.5, 0.5;
+    nn.connections[1].biases << 0.5, 0.5;
+
+
+    cout << nn.cost(nn.predict (features), targets) << "\n\n";
+    nn.train(1);
+    cout << "\n Trained outputs:" << endl;
     cout << nn.predict (features) << "\n\n";
     }
 
 /* TO DO LIST:
--
+
+- implement momentum
+
+- average deltas over samples, instead of incrementing weights/biases every sample
+
+- verify Dr. Hamlin's test
+
+- sort out how activation function passing is going to work. current ideas:
+    - pointers to functions are passsed
+    - object containing both activation function (double in, double out), and its first derivative(double in, double out)
+
+- implement sigmoid activation
+    - use to verify numbers given in Hamlin email
+
+- make gradient descent avergage deltas instead of summing them
+
+- implement way to choose cost function (comes with derivative)
+
+- implement binary crossentropy as cost for XOR dataset
+
 
 NONESSENTIAL:
 
 -move stuff to private
 
-- sort out how activation function passing is going to work. current ideas:
-    - pointers to functions are passsed
-    - object containing both activation function (double in, double out), and its first derivative(double in, double out)
-        -or, even better, have them both be MatrixXd in, MatrixXd out (for better parallelism)
 
 - put eigen in include path of compiler, then fix line 3
 
